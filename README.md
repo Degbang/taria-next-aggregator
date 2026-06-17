@@ -139,7 +139,7 @@ Notes:
 
 - `DATABASE_URL` should use the Supabase session pooler URL on port `5432` for Workers runtime compatibility.
 - `DIRECT_URL` is only needed for Prisma CLI commands like `npm run db:push`; it is not used by the deployed Worker runtime.
-- `wrangler.jsonc` is already configured with the custom domain route for `taria.tripsecuregh.com`.
+- Deploy without a custom route first. Add the custom domain later after the Cloudflare zone is confirmed.
 - For GitHub-connected Workers Builds, set the same variables in Cloudflare under build variables and secrets.
 
 Official references:
