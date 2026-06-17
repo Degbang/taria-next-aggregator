@@ -16,6 +16,20 @@ export async function getAssessmentById(assessmentId) {
   return prisma.assessment.findUnique({ where: { id: assessmentId } });
 }
 
+export async function listAssessments(limit = 25) {
+  return prisma.assessment.findMany({
+    orderBy: { submittedAt: "desc" },
+    take: Math.max(1, Math.min(limit, 100)),
+    include: {
+      recommendation: {
+        include: {
+          items: { orderBy: { rank: "asc" } },
+        },
+      },
+    },
+  });
+}
+
 export async function getOrCreateRecommendations(assessmentId) {
   const existing = await prisma.recommendation.findUnique({
     where: { assessmentId },

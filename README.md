@@ -45,6 +45,7 @@ For production, use Supabase Postgres:
 
 - `DATABASE_URL`: Supabase pooled connection string
 - `DIRECT_URL`: Supabase direct connection string for Prisma schema changes
+- If your password contains reserved URL characters such as `@`, encode them before placing them in the connection string
 
 Key variables:
 
@@ -52,6 +53,8 @@ Key variables:
 - `DIRECT_URL`: direct Prisma migration connection
 - `NEXT_PUBLIC_API_BASE_URL`: browser API base, defaults to `http://localhost:3000`
 - `RECOMMENDATION_AUTH_ENABLED`: enables API-key auth on recommendation routes
+- `RECORDS_AUTH_ENABLED`: enables API-key auth on saved-record routes
+- `RECORDS_API_KEYS`: comma-separated API keys accepted by saved-record routes
 - `RECOMMENDATION_RATE_LIMIT_ENABLED`: enables in-memory rate limiting
 - `TRIPSECURE_*`: external product source configuration
 - `AI_*`: AI ranking configuration
@@ -155,6 +158,17 @@ Current persisted records:
 - Farmer submitted answers
 - Farmer calculated question and section scores
 - Farmer final score, risk level, loan amount, insurance premium, and insurance package
+
+Protected records APIs:
+
+- `GET /api/v1/records/assessments?limit=25`
+- `GET /api/v1/records/farmer-risk-assessments?limit=25`
+
+Send the API key in:
+
+```http
+x-taria-key: YOUR_SECRET_KEY
+```
 
 ## Validation
 

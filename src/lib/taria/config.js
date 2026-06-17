@@ -14,6 +14,11 @@ export const tariaConfig = {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean),
+  recordsAuthEnabled: process.env.RECORDS_AUTH_ENABLED !== "false",
+  recordsApiKeys: (process.env.RECORDS_API_KEYS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean),
   recommendationRateLimitEnabled: process.env.RECOMMENDATION_RATE_LIMIT_ENABLED === "true",
   recommendationRateLimitRequests: Number(process.env.RECOMMENDATION_RATE_LIMIT_REQUESTS || 60),
   recommendationRateLimitWindowSeconds: Number(process.env.RECOMMENDATION_RATE_LIMIT_WINDOW_SECONDS || 60),

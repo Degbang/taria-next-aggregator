@@ -58,3 +58,30 @@ export function enforceRecommendationSecurity(request) {
 
   return null;
 }
+
+export function enforceRecordsSecurity(request) {
+  const apiKey = request.headers.get("x-taria-key")?.trim() || "";
+
+  if (!tariaConfig.recordsAuthEnabled) {
+    return null;
+  }
+
+  if (tariaConfig.recordsApiKeys.length === 0) {
+    return NextResponse.json(
+      { message: "Records auth is misconfigured", timestamp: new Date().toISOString() },
+      { status: 503 }
+    );
+  }
+
+  if (!tariaConfig.recordsApiKeys.includes(apiKey)) {
+    return NextResponse.json(
+      { message: "Unauthorized", timestamp: new Date().toISOString() },
+      {
+        status: 401,
+        headers: { "WWW-Authenticate": 'ApiKey realm="records"' },
+      }
+    );
+  }
+
+  return null;
+}

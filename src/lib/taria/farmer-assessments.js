@@ -32,6 +32,13 @@ export async function createFarmerRiskAssessment(input) {
   return toFarmerRiskResponse(assessment, calculation);
 }
 
+export async function listFarmerRiskAssessments(limit = 25) {
+  return prisma.farmerRiskAssessment.findMany({
+    orderBy: { submittedAt: "desc" },
+    take: Math.max(1, Math.min(limit, 100)),
+  });
+}
+
 function normalizeFarmerAnswers(input) {
   return Object.fromEntries(
     Object.entries(farmerQuestionMap).map(([controlName, question]) => {
