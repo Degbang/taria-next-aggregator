@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Assessment {
+  id                          String           @id @default(uuid())
+  submittedAt                 DateTime         @default(now())
+  employmentIncomeSituation   String
+  dependentCountRange         String
+  assetTypes                  String[]
+  travelPattern               String
+  lateNightCommuteFrequency   String
+  mobilityMode                String
+  riskyActivityFrequency      String
+  belongingsCareLevel         String
+  expensePredictability       String
+  emergencyResponseCapacity   String
+  paymentPreference           String
+  insuranceBudgetPercentRange String
+  insuranceExperience         String
+  insuranceConcern            String
+  choicePriority              String
+  recommendation              Recommendation?
+}
+
+model Recommendation {
+  id           String               @id @default(uuid())
+  assessmentId String               @unique
+  createdAt    DateTime             @default(now())
+  message      String?
+  rawPayload   String?
+  assessment   Assessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  items        RecommendationItem[]
+}
+
+model RecommendationItem {
+  id               String         @id @default(uuid())
+  recommendationId String
+  productId        String
+  productName      String
+  reason           String
+  rank             Int
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+
+  @@index([recommendationId, rank])
+}
+
+model Product {
+  id                          String   @id
+  name                        String
+  insurer                     String
+  category                    String
+  tags                        String[]
+  supportedPaymentFrequencies String[]
+  minBudgetPercent            Int
+  maxBudgetPercent            Int
+  coverageScope               String
+  travelEligible              Boolean  @default(false)
+  deviceProtectionEligible    Boolean  @default(false)
+  vehicleEligible             Boolean  @default(false)
+  homeEligible                Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: taria-next-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: taria_next
+      POSTGRES_USER: taria
+      POSTGRES_PASSWORD: taria
+    ports:
+      - "5434:5432"
+    volumes:
+      - taria-next-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  taria-next-postgres-data:
