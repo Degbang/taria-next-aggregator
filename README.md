@@ -88,6 +88,68 @@ npm run build
 npm start
 ```
 
+## Cloudflare Workers Deploy
+
+This app is configured for Cloudflare Workers using the OpenNext adapter.
+
+Included files:
+
+- `wrangler.jsonc`
+- `open-next.config.ts`
+- `.dev.vars.example`
+- `prisma.config.ts`
+
+Local preview in the Workers runtime:
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run preview
+```
+
+Production deploy from your machine:
+
+```bash
+npm run deploy
+```
+
+Required Cloudflare runtime secrets:
+
+```bash
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put NEXT_PUBLIC_API_BASE_URL
+npx wrangler secret put TRIPSECURE_BASE_URL
+npx wrangler secret put TRIPSECURE_POLICY_PATH
+npx wrangler secret put TRIPSECURE_API_KEY
+npx wrangler secret put TRIPSECURE_API_KEY_HEADER
+npx wrangler secret put AI_BASE_URL
+npx wrangler secret put AI_API_KEY
+npx wrangler secret put AI_MODEL
+npx wrangler secret put AI_TIMEOUT_MS
+npx wrangler secret put AI_TEMPERATURE
+npx wrangler secret put RECOMMENDATION_AUTH_ENABLED
+npx wrangler secret put RECOMMENDATION_API_KEYS
+npx wrangler secret put RECORDS_AUTH_ENABLED
+npx wrangler secret put RECORDS_API_KEYS
+npx wrangler secret put RECOMMENDATION_RATE_LIMIT_ENABLED
+npx wrangler secret put RECOMMENDATION_RATE_LIMIT_REQUESTS
+npx wrangler secret put RECOMMENDATION_RATE_LIMIT_WINDOW_SECONDS
+```
+
+Notes:
+
+- `DATABASE_URL` should use the Supabase session pooler URL on port `5432` for Workers runtime compatibility.
+- `DIRECT_URL` is only needed for Prisma CLI commands like `npm run db:push`; it is not used by the deployed Worker runtime.
+- `wrangler.jsonc` is already configured with the custom domain route for `taria.tripsecuregh.com`.
+- For GitHub-connected Workers Builds, set the same variables in Cloudflare under build variables and secrets.
+
+Official references:
+
+- Cloudflare Next.js Workers guide: https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/
+- Cloudflare automatic project config: https://developers.cloudflare.com/workers/framework-guides/automatic-configuration/
+- Cloudflare custom domains: https://developers.cloudflare.com/workers/configuration/routing/custom-domains/
+- Prisma on Cloudflare Workers: https://www.prisma.io/docs/orm/prisma-client/deployment/edge/deploy-to-cloudflare
+- Prisma config reference: https://www.prisma.io/docs/orm/reference/prisma-config-reference
+
 ## VPS Deploy
 
 Target host: `taria.tripsecuregh.com`

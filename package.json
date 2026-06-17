@@ -10,21 +10,27 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.19.11",
+    "@prisma/adapter-pg": "^6.19.0",
     "@prisma/client": "^6.19.0",
     "next": "16.2.9",
+    "pg": "^8.21.0",
+    "pg-cloudflare": "^1.4.0",
     "prisma": "^6.19.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
+    "eslint-config-next": "16.2.9",
+    "wrangler": "^4.101.0"
   }
 }
