@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { startTransition, useState } from "react";
 import {
-  calculateFarmerRisk,
   farmerFinalFormula,
   farmerInitialForm,
   farmerInsuranceCap,
@@ -19,6 +18,8 @@ export function FarmerRiskClient() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [activeResultPageIndex, setActiveResultPageIndex] = useState(0);
   const [result, setResult] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const currentStep = farmerQuestionSteps[currentStepIndex];
   const isFirstStep = currentStepIndex === 0;
@@ -44,10 +45,6 @@ export function FarmerRiskClient() {
     }));
   }
 
-  function getScore(controlName) {
-    return farmerQuestionMap[controlName].getScore(form[controlName]);
-  }
-
   function validateCurrentStep() {
     const nextTouched = {};
     let isValid = true;
@@ -68,13 +65,14 @@ export function FarmerRiskClient() {
     return isValid;
   }
 
-  function calculateRisk(event) {
+  async function calculateRisk(event) {
     event.preventDefault();
 
     const nextTouched = Object.fromEntries(
       Object.keys(farmerQuestionMap).map((controlName) => [controlName, true])
     );
     setTouched(nextTouched);
+    setSubmitError(null);
 
     const hasInvalidAnswer = Object.entries(farmerQuestionMap).some(([controlName, question]) => {
       const value = form[controlName];
@@ -88,26 +86,35 @@ export function FarmerRiskClient() {
       return;
     }
 
-    const questionScores = Object.keys(farmerQuestionMap).reduce((accumulator, controlName) => {
-      accumulator[controlName] = getScore(controlName);
-      return accumulator;
-    }, {});
+    setIsSaving(true);
 
-    const calculation = calculateFarmerRisk(questionScores);
-
-    startTransition(() => {
-      setResult({
-        score: calculation.finalScoreDisplay,
-        rawScore: calculation.finalScoreRaw,
-        riskLevel: calculation.riskLevel,
-        loanRecommendationTier: calculation.loanRecommendationTier,
-        loanAmount: calculation.loanAmount,
-        insurancePremium: calculation.insurancePremium,
-        insurancePackage: calculation.insurancePackage,
-        sectionScores: calculation.sectionScoresDisplay,
+    try {
+      const response = await fetch("/api/v1/farmer-risk-assessments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
       });
-      setActiveResultPageIndex(0);
-    });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || "We could not save the farmer assessment.");
+      }
+
+      startTransition(() => {
+        setResult({
+          assessmentId: payload.assessmentId,
+          submittedAt: payload.submittedAt,
+          ...payload.result,
+        });
+        setActiveResultPageIndex(0);
+      });
+    } catch (error) {
+      setSubmitError(error.message || "We could not save the farmer assessment.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function getStepStatus(stepIndex) {
@@ -238,6 +245,7 @@ export function FarmerRiskClient() {
                 <button
                   className="btn btn--primary"
                   type="button"
+                  disabled={isSaving}
                   onClick={() => {
                     if (validateCurrentStep()) {
                       setCurrentStepIndex((current) => Math.min(current + 1, farmerQuestionSteps.length - 1));
@@ -247,12 +255,14 @@ export function FarmerRiskClient() {
                   Next step
                 </button>
               ) : (
-                <button className="btn btn--primary" type="submit">
-                  Calculate Farmer Risk
+                <button className="btn btn--primary" type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving profile..." : "Calculate Farmer Risk"}
                 </button>
               )}
             </div>
           </div>
+
+          {submitError ? <p className="farmer-form__status farmer-form__status--error">{submitError}</p> : null}
         </form>
 
         <section className="farmer-results">
@@ -314,6 +324,9 @@ export function FarmerRiskClient() {
                       <p>
                         The final risk score places the farmer into a capped funding and premium bracket. Higher
                         scores unlock more loan value and a lower premium amount.
+                      </p>
+                      <p className="farmer-results__save-note">
+                        Saved assessment ID: {result.assessmentId}
                       </p>
                     </div>
                   </section>

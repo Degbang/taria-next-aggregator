@@ -767,6 +767,16 @@ a {
   text-align: right;
 }
 
+.farmer-form__status {
+  margin-top: 10px;
+  color: #1b6f4c;
+  font-size: 0.88rem;
+}
+
+.farmer-form__status--error {
+  color: #a33a3a;
+}
+
 .farmer-results {
   padding: 16px;
   display: flex;
@@ -951,6 +961,13 @@ a {
   margin: 0;
   color: #55617a;
   line-height: 1.6;
+}
+
+.farmer-results__save-note {
+  margin-top: 10px !important;
+  font-size: 0.82rem;
+  color: #35518b !important;
+  font-weight: 600;
 }
 
 .farmer-results__metrics {

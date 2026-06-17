@@ -40,11 +40,16 @@ $env:PATH="$HOME/.nvm/versions/node/v22.21.0/bin:$env:PATH"
 
 Copy `.env.example` to `.env` if you need to reset local configuration.
 
-Default local values already point to the bundled Postgres container on port `5434`.
+Default local values point to the bundled Postgres container on port `5434`.
+For production, use Supabase Postgres:
+
+- `DATABASE_URL`: Supabase pooled connection string
+- `DIRECT_URL`: Supabase direct connection string for Prisma schema changes
 
 Key variables:
 
 - `DATABASE_URL`: Prisma connection string
+- `DIRECT_URL`: direct Prisma migration connection
 - `NEXT_PUBLIC_API_BASE_URL`: browser API base, defaults to `http://localhost:3000`
 - `RECOMMENDATION_AUTH_ENABLED`: enables API-key auth on recommendation routes
 - `RECOMMENDATION_RATE_LIMIT_ENABLED`: enables in-memory rate limiting
@@ -140,6 +145,16 @@ Official Cloudflare references:
 - Proxy status: https://developers.cloudflare.com/dns/proxy-status/
 - Origin CA certificates: https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/
 - Full (strict) SSL mode: https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/
+
+## What The Database Stores
+
+Current persisted records:
+
+- Insurance assessments and their recommendation results
+- Farmer risk assessments
+- Farmer submitted answers
+- Farmer calculated question and section scores
+- Farmer final score, risk level, loan amount, insurance premium, and insurance package
 
 ## Validation
 

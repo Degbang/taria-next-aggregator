@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ENUMS } from "./constants";
+import { farmerQuestionMap } from "./farmer-risk";
 
 export const assessmentSchema = z.object({
   employmentIncomeSituation: z.enum(ENUMS.employmentIncomeSituation),
@@ -18,6 +19,21 @@ export const assessmentSchema = z.object({
   insuranceConcern: z.enum(ENUMS.insuranceConcern),
   choicePriority: z.enum(ENUMS.choicePriority),
 });
+
+export const farmerRiskAssessmentSchema = z.object(
+  Object.fromEntries(
+    Object.entries(farmerQuestionMap).map(([controlName, question]) => {
+      if (question.inputType === "number") {
+        return [controlName, z.coerce.number().min(question.min ?? 0)];
+      }
+
+      return [
+        controlName,
+        z.enum(question.options.map((option) => option.value)),
+      ];
+    })
+  )
+);
 
 export function formatZodError(error) {
   return error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(", ");

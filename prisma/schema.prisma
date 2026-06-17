@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Assessment {
@@ -66,4 +67,19 @@ model Product {
   homeEligible                Boolean  @default(false)
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
+}
+
+model FarmerRiskAssessment {
+  id                     String   @id @default(uuid())
+  submittedAt            DateTime @default(now())
+  answers                Json
+  questionScores         Json
+  sectionScores          Json
+  finalScoreRaw          Float
+  finalScoreDisplay      Int
+  riskLevel              String
+  loanRecommendationTier String
+  loanAmount             Int
+  insurancePremium       Int
+  insurancePackage       String[]
 }
