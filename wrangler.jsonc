@@ -7,6 +7,12 @@
   "observability": {
     "enabled": true
   },
+  "routes": [
+    {
+      "pattern": "risk.tripsecureagrifinanceltd.com",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
