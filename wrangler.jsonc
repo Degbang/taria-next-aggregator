@@ -9,7 +9,7 @@
   },
   "routes": [
     {
-      "pattern": "risk.tripsecureagrifinanceltd.com",
+      "pattern": "taria.tripsecureagrifinanceltd.com",
       "custom_domain": true
     }
   ],
