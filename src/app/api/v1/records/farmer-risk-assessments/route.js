@@ -17,6 +17,12 @@ export async function GET(request) {
     items: records.map((assessment) => ({
       assessmentId: assessment.id,
       submittedAt: assessment.submittedAt,
+      context: {
+        sourceApplication: assessment.sourceApplication,
+        externalFarmerId: assessment.externalFarmerId,
+        farmId: assessment.farmId,
+        loanApplicationId: assessment.loanApplicationId,
+      },
       answers: assessment.answers,
       questionScores: assessment.questionScores,
       sectionScores: assessment.sectionScores,

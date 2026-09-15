@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   farmerFinalFormula,
   farmerInitialForm,
@@ -19,7 +19,22 @@ export function FarmerRiskClient() {
   const [activeResultPageIndex, setActiveResultPageIndex] = useState(0);
   const [result, setResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [returnStatus, setReturnStatus] = useState("idle");
+  const [integrationContext, setIntegrationContext] = useState({
+    sourceApplication: "",
+    externalFarmerId: "",
+    farmId: "",
+    loanApplicationId: "",
+    returnOrigin: "",
+  });
+  const { sourceApplication, externalFarmerId, farmId, loanApplicationId, returnOrigin } = integrationContext;
+  const isAgrifinanceLaunch =
+    sourceApplication.toLowerCase() === "agrifinance" && Boolean(returnOrigin);
+  const shouldReturnToOpener = Boolean(
+    isAgrifinanceLaunch && typeof window !== "undefined" && window.opener && !window.opener.closed
+  );
 
   const currentStep = farmerQuestionSteps[currentStepIndex];
   const isFirstStep = currentStepIndex === 0;
@@ -37,6 +52,74 @@ export function FarmerRiskClient() {
       .slice(0, currentStepIndex)
       .reduce((questionCount, step) => questionCount + step.questions.length, 0) + 1;
   const currentStepEnd = currentStepStart + currentStep.questions.length - 1;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    setIntegrationContext({
+      sourceApplication: params.get("sourceApplication")?.trim() || "",
+      externalFarmerId: params.get("externalFarmerId")?.trim() || "",
+      farmId: params.get("farmId")?.trim() || "",
+      loanApplicationId: params.get("loanApplicationId")?.trim() || "",
+      returnOrigin: params.get("returnOrigin")?.trim() || "",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isAgrifinanceLaunch || !externalFarmerId || !farmId) {
+      return;
+    }
+
+    let cancelled = false;
+    const params = new URLSearchParams({ externalFarmerId, farmId });
+
+    async function loadExistingAssessment() {
+      setIsLoadingExisting(true);
+      setSubmitError(null);
+
+      try {
+        const response = await fetch(`/api/v1/farmer-risk-assessments?${params.toString()}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.message || "We could not load the previous farmer assessment.");
+        }
+
+        const saved = payload.assessment;
+        if (!saved || cancelled) {
+          return;
+        }
+
+        setForm({ ...farmerInitialForm, ...(saved.answers || {}) });
+        setResult({
+          assessmentId: saved.assessmentId,
+          submittedAt: saved.submittedAt,
+          persisted: saved.persisted ?? true,
+          context: saved.context || { sourceApplication, externalFarmerId, farmId, loanApplicationId },
+          ...saved.result,
+        });
+        setActiveResultPageIndex(0);
+        setCurrentStepIndex(0);
+        setTouched({});
+        setReturnStatus("idle");
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load the previous farmer risk assessment.", error);
+          setSubmitError(error.message || "We could not load the previous farmer assessment.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingExisting(false);
+        }
+      }
+    }
+
+    loadExistingAssessment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [externalFarmerId, farmId, isAgrifinanceLaunch, loanApplicationId, sourceApplication]);
 
   function handleFieldChange(controlName, value) {
     setForm((current) => ({
@@ -87,6 +170,7 @@ export function FarmerRiskClient() {
     }
 
     setIsSaving(true);
+    setReturnStatus("idle");
 
     try {
       const response = await fetch("/api/v1/farmer-risk-assessments", {
@@ -94,7 +178,13 @@ export function FarmerRiskClient() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          ...(sourceApplication ? { sourceApplication } : {}),
+          ...(externalFarmerId ? { externalFarmerId } : {}),
+          ...(farmId ? { farmId } : {}),
+          ...(loanApplicationId ? { loanApplicationId } : {}),
+        }),
       });
       const payload = await response.json();
 
@@ -102,14 +192,19 @@ export function FarmerRiskClient() {
         throw new Error(payload.message || "We could not save the farmer assessment.");
       }
 
-      startTransition(() => {
-        setResult({
-          assessmentId: payload.assessmentId,
-          submittedAt: payload.submittedAt,
-          ...payload.result,
-        });
-        setActiveResultPageIndex(0);
+      setResult({
+        assessmentId: payload.assessmentId,
+        submittedAt: payload.submittedAt,
+        persisted: payload.persisted ?? true,
+        context: payload.context || {
+          sourceApplication,
+          externalFarmerId,
+          farmId,
+          loanApplicationId,
+        },
+        ...payload.result,
       });
+      setActiveResultPageIndex(0);
     } catch (error) {
       setSubmitError(error.message || "We could not save the farmer assessment.");
     } finally {
@@ -127,24 +222,98 @@ export function FarmerRiskClient() {
     return "upcoming";
   }
 
+  function returnToAgrifinance() {
+    if (!isAgrifinanceLaunch) {
+      return;
+    }
+
+    if (result && shouldReturnToOpener) {
+      try {
+        window.opener.postMessage(
+          {
+            type: "taria.farmerRisk.completed",
+            assessment: {
+              assessmentId: result.assessmentId,
+              submittedAt: result.submittedAt,
+              persisted: result.persisted,
+              context: result.context,
+              result: {
+                score: result.score,
+                rawScore: result.rawScore,
+                riskLevel: result.riskLevel,
+                loanRecommendationTier: result.loanRecommendationTier,
+                loanAmount: result.loanAmount,
+                insurancePremium: result.insurancePremium,
+                insurancePackage: result.insurancePackage,
+                sectionScores: result.sectionScores,
+              },
+            },
+          },
+          returnOrigin
+        );
+        setReturnStatus("sent");
+      } catch (error) {
+        console.error("Failed to return farmer risk result to opener.", error);
+        setReturnStatus("failed");
+        return;
+      }
+    }
+
+    if (window.opener && !window.opener.closed) {
+      window.opener.focus();
+      window.close();
+      return;
+    }
+
+    window.location.assign(returnOrigin);
+  }
+
   return (
-    <section className="farmer-page">
+    <section className={`farmer-page${isAgrifinanceLaunch ? " farmer-page--integrated" : ""}`}>
       <div className="farmer-page__header">
-        <div>
-          <span className="farmer-page__tag">Farmer Risk Profile</span>
-          <h1>Farmer risk profile</h1>
-          <p>Answer the questions across five domains to assess farmer strength, exposure, and support needs.</p>
+        <div className="farmer-page__identity">
+          <div className="farmer-page__eyebrow-row">
+            <span className="farmer-page__tag">TARIA / FARM RISK ENGINE</span>
+            <span className={`farmer-page__status-pill${result ? " is-saved" : ""}`}>
+              {result ? "Assessment saved" : "Ready to assess"}
+            </span>
+          </div>
+          <h1>Understand the farm before you fund it.</h1>
+          <p>Update the farm profile, calculate its current risk, and return the saved decision to Agrifinance.</p>
+          {sourceApplication ? (
+            <div className="farmer-page__context" aria-label="Assessment context">
+              <span><small>FARMER</small>{externalFarmerId || "—"}</span>
+              <span><small>FARM</small>{farmId || "—"}</span>
+              {loanApplicationId ? <span><small>LOAN</small>{loanApplicationId}</span> : null}
+            </div>
+          ) : null}
+          {isLoadingExisting ? (
+            <p className="farmer-page__loading-note">Loading the latest saved assessment for this farm…</p>
+          ) : null}
         </div>
-        <Link className="btn btn--secondary farmer-page__switch" href="/insurance/assessment">
-          Go to Insurance Risk Profiling
-        </Link>
+        <div className="farmer-page__header-actions">
+          {isAgrifinanceLaunch ? (
+            <button className="btn btn--secondary" type="button" onClick={returnToAgrifinance}>
+              Return
+            </button>
+          ) : null}
+          {!isAgrifinanceLaunch ? (
+            <Link className="btn btn--secondary farmer-page__switch" href="/insurance/assessment">
+              Go to Insurance Risk Profiling
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="farmer-page__grid">
         <form className="farmer-form" onSubmit={calculateRisk}>
           <div className="farmer-form__header">
-            <h2>Assessment questions</h2>
-            <p>Work through each domain and complete the current section before moving on.</p>
+            <div>
+              <span className="farmer-form__kicker">01 / 05 · FARM PROFILE</span>
+              <h2>Assessment inputs</h2>
+              <p>Work through each domain. Your changes replace the saved assessment for this farm when you calculate.</p>
+            </div>
+            {result ? <span className="farmer-form__saved-badge">Editing saved profile</span> : null}
           </div>
 
           <div className="farmer-stepper">
@@ -267,15 +436,19 @@ export function FarmerRiskClient() {
 
         <section className="farmer-results">
           <div className="farmer-results__header">
-            <h2>Risk Output</h2>
-            <p>Overall result, domain breakdown, loan guidance, and insurance package.</p>
+            <div>
+              <span className="farmer-results__kicker">02 / DECISION</span>
+              <h2>Risk output</h2>
+            </div>
+            <span className="farmer-results__live-dot">LIVE</span>
+            <p>Saved score, lending guidance, and the protection package for this farm.</p>
           </div>
 
           {result ? (
             <>
               <div className="farmer-results__score">
                 <div>
-                  <span className="farmer-results__score-label">Farmer risk score</span>
+                    <span className="farmer-results__score-label">Farm risk score</span>
                   <strong>{result.score}/100</strong>
                 </div>
                 <span className="farmer-results__level">{result.riskLevel}</span>
@@ -325,9 +498,27 @@ export function FarmerRiskClient() {
                         The final risk score places the farmer into a capped funding and premium bracket. Higher
                         scores unlock more loan value and a lower premium amount.
                       </p>
+                      {result.context?.sourceApplication ? (
+                        <p className="farmer-results__save-note">
+                          Linked to {result.context.sourceApplication}
+                          {result.context.externalFarmerId ? ` farmer ${result.context.externalFarmerId}` : ""}
+                          {result.context.loanApplicationId ? ` / loan ${result.context.loanApplicationId}` : ""}.
+                        </p>
+                      ) : null}
                       <p className="farmer-results__save-note">
-                        Saved assessment ID: {result.assessmentId}
+                        {result.persisted
+                          ? `Saved assessment ID: ${result.assessmentId}`
+                          : `Temporary result ID: ${result.assessmentId} (storage unavailable)`}
                       </p>
+                      {isAgrifinanceLaunch ? (
+                        <p className="farmer-results__save-note">
+                          {returnStatus === "sent"
+                            ? "Result returned to Agrifinance. Use the return button if this window remains open."
+                            : returnStatus === "failed"
+                              ? "Taria calculated the result, but sending it back to Agrifinance failed."
+                            : "Review this result, then click Return to Agrifinance."}
+                        </p>
+                      ) : null}
                     </div>
                   </section>
                 ) : null}
@@ -398,8 +589,9 @@ export function FarmerRiskClient() {
             </>
           ) : (
             <div className="farmer-results__placeholder">
-              <h3>No score yet</h3>
-              <p>Complete all 45 questionnaire inputs to generate the five-domain weighted output.</p>
+              <span className="farmer-results__empty-mark">◎</span>
+              <h3>Score appears here</h3>
+              <p>Complete all 45 inputs, then calculate to save the current risk decision for this farm.</p>
               <div className="farmer-results__placeholder-pages">
                 <span>Financial overview</span>
                 <span>Decision summary</span>

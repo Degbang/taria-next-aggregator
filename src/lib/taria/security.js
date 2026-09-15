@@ -59,6 +59,33 @@ export function enforceRecommendationSecurity(request) {
   return null;
 }
 
+export function enforceFarmerRiskSecurity(request) {
+  const apiKey = request.headers.get("x-taria-key")?.trim() || "";
+
+  if (!tariaConfig.farmerRiskAuthEnabled) {
+    return null;
+  }
+
+  if (tariaConfig.farmerRiskApiKeys.length === 0) {
+    return NextResponse.json(
+      { message: "Farmer risk auth is misconfigured", timestamp: new Date().toISOString() },
+      { status: 503 }
+    );
+  }
+
+  if (!tariaConfig.farmerRiskApiKeys.includes(apiKey)) {
+    return NextResponse.json(
+      { message: "Unauthorized", timestamp: new Date().toISOString() },
+      {
+        status: 401,
+        headers: { "WWW-Authenticate": 'ApiKey realm="farmer-risk"' },
+      }
+    );
+  }
+
+  return null;
+}
+
 export function enforceRecordsSecurity(request) {
   const apiKey = request.headers.get("x-taria-key")?.trim() || "";
 
@@ -84,4 +111,30 @@ export function enforceRecordsSecurity(request) {
   }
 
   return null;
+}
+
+export function getFarmerRiskCorsHeaders(request) {
+  const origin = request.headers.get("origin")?.trim();
+
+  if (!origin) {
+    return {};
+  }
+
+  const allowedOrigins = tariaConfig.farmerRiskAllowedOrigins;
+
+  if (allowedOrigins.length === 0) {
+    return {};
+  }
+
+  if (!allowedOrigins.includes("*") && !allowedOrigins.includes(origin)) {
+    return {};
+  }
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigins.includes("*") ? "*" : origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, x-taria-key",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
 }

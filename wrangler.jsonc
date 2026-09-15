@@ -1,20 +1,28 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "taria-next-aggregator",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-06-17",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": {
-    "enabled": true
-  },
-  "routes": [
-    {
-      "pattern": "taria.tripsecureagrifinanceltd.com",
-      "custom_domain": true
-    }
-  ],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "taria-next-aggregator",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-06-17",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"routes": [
+		{
+			"pattern": "taria.tripsecureagrifinanceltd.com",
+			"custom_domain": true
+		}
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"hyperdrive": [
+		{
+			"binding": "HYPERDRIVE",
+			"id": "d46a2c36b39f4162a3ea8af02e016629"
+		}
+	]
 }

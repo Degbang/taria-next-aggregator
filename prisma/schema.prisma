@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
@@ -72,6 +73,10 @@ model Product {
 model FarmerRiskAssessment {
   id                     String   @id @default(uuid())
   submittedAt            DateTime @default(now())
+  sourceApplication      String?
+  externalFarmerId       String?
+  farmId                 String?
+  loanApplicationId      String?
   answers                Json
   questionScores         Json
   sectionScores          Json
@@ -82,4 +87,6 @@ model FarmerRiskAssessment {
   loanAmount             Int
   insurancePremium       Int
   insurancePackage       String[]
+
+  @@index([externalFarmerId, farmId, submittedAt])
 }

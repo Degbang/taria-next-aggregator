@@ -20,20 +20,37 @@ export const assessmentSchema = z.object({
   choicePriority: z.enum(ENUMS.choicePriority),
 });
 
-export const farmerRiskAssessmentSchema = z.object(
-  Object.fromEntries(
-    Object.entries(farmerQuestionMap).map(([controlName, question]) => {
-      if (question.inputType === "number") {
-        return [controlName, z.coerce.number().min(question.min ?? 0)];
-      }
+export const farmerRiskAssessmentSchema = z
+  .object({
+    ...Object.fromEntries(
+      Object.entries(farmerQuestionMap).map(([controlName, question]) => {
+        if (question.inputType === "number") {
+          return [controlName, z.coerce.number().min(question.min ?? 0)];
+        }
 
-      return [
-        controlName,
-        z.enum(question.options.map((option) => option.value)),
-      ];
-    })
-  )
-);
+        return [
+          controlName,
+          z.enum(question.options.map((option) => option.value)),
+        ];
+      })
+    ),
+    sourceApplication: z.string().trim().min(1).max(100).optional(),
+    externalFarmerId: z.string().trim().min(1).max(120).optional(),
+    farmId: z.string().trim().min(1).max(120).optional(),
+    loanApplicationId: z.string().trim().min(1).max(120).optional(),
+  })
+  .superRefine((input, context) => {
+    const hasFarmer = Boolean(input.externalFarmerId);
+    const hasFarm = Boolean(input.farmId);
+
+    if (hasFarmer !== hasFarm) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [hasFarmer ? "farmId" : "externalFarmerId"],
+        message: "externalFarmerId and farmId must be provided together.",
+      });
+    }
+  });
 
 export function formatZodError(error) {
   return error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join(", ");

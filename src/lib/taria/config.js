@@ -14,6 +14,15 @@ export const tariaConfig = {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean),
+  farmerRiskAuthEnabled: process.env.FARMER_RISK_AUTH_ENABLED === "true",
+  farmerRiskApiKeys: (process.env.FARMER_RISK_API_KEYS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean),
+  farmerRiskAllowedOrigins: (process.env.FARMER_RISK_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean),
   recordsAuthEnabled: process.env.RECORDS_AUTH_ENABLED !== "false",
   recordsApiKeys: (process.env.RECORDS_API_KEYS || "")
     .split(",")
