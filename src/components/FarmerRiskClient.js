@@ -615,7 +615,7 @@ function isAllowedReturnOrigin(value) {
   try {
     const origin = new URL(value).origin;
     const configured = (process.env.NEXT_PUBLIC_AGRIFINANCE_ALLOWED_ORIGINS ||
-      "http://localhost:4200,https://agrifinance.tripsecureagrifinanceltd.com")
+      "http://localhost:4200,https://agrifinance.tripsecureagrifinanceltd.com,https://agri-finance-frontend.vercel.app")
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
