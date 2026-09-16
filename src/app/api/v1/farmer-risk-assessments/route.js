@@ -35,7 +35,8 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const externalFarmerId = searchParams.get("externalFarmerId")?.trim() || "";
   const farmId = searchParams.get("farmId")?.trim() || "";
-  const handoff = searchParams.get("handoff")?.trim() || "";
+  const handoff =
+    request.headers.get("x-taria-handoff")?.trim() || searchParams.get("handoff")?.trim() || "";
 
   if (!externalFarmerId || !farmId) {
     return NextResponse.json(
