@@ -15,7 +15,7 @@ export const homeModules = [
     ],
     outputTitle: "Insurance outputs",
     outputItems: [
-      "Assessment ID and recommendation results",
+      "Saved assessment and recommendation results",
       "Recommended approved products",
       "Clear reasons tied to customer responses",
     ],

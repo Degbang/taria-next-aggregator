@@ -8,7 +8,9 @@ import {
   enforceFarmerRiskSecurity,
   getFarmerRiskCorsHeaders,
   verifyFarmerRiskHandoffToken,
+  enforceRateLimit,
 } from "@/lib/taria/security";
+import { tariaConfig } from "@/lib/taria/config";
 import {
   farmerRiskAssessmentSchema,
   formatZodError,
@@ -69,6 +71,16 @@ export async function GET(request) {
 export async function POST(request) {
   const corsHeaders = getFarmerRiskCorsHeaders(request);
   try {
+    const rateLimited = enforceRateLimit(request, {
+      action: "farmer-risk-assessment-create",
+      maxRequests: tariaConfig.farmerRiskRateLimitRequests,
+      windowSeconds: tariaConfig.farmerRiskRateLimitWindowSeconds,
+    });
+    if (rateLimited) {
+      Object.entries(corsHeaders).forEach(([key, value]) => rateLimited.headers.set(key, value));
+      return rateLimited;
+    }
+
     const payload = await request.json();
     const input = farmerRiskAssessmentSchema.parse(payload);
     const requiresHandoff = Boolean(input.externalFarmerId || input.farmId || input.sourceApplication);

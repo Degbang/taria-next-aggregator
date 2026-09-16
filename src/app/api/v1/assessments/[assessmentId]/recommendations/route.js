@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
 import { getOrCreateRecommendations } from "@/lib/taria/recommendations";
-import { enforceRecommendationSecurity } from "@/lib/taria/security";
+import {
+  enforceAssessmentSession,
+  enforceRecommendationSecurity,
+} from "@/lib/taria/security";
 
 async function handle(request, context) {
-  const blocked = enforceRecommendationSecurity(request);
+  const { assessmentId } = await context.params;
+  const sessionBlocked = await enforceAssessmentSession(request, assessmentId, { allowApiKey: true });
+  if (sessionBlocked) return sessionBlocked;
+
+  const blocked = enforceRecommendationSecurity(request, { authenticatedBySession: true });
   if (blocked) {
     return blocked;
   }
 
-  const { assessmentId } = await context.params;
   const result = await getOrCreateRecommendations(assessmentId);
 
   if (!result) {
     return NextResponse.json(
-      { message: `Assessment not found: ${assessmentId}`, timestamp: new Date().toISOString() },
+      { message: "Assessment not found.", timestamp: new Date().toISOString() },
       { status: 404 }
     );
   }

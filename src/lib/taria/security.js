@@ -7,10 +7,40 @@ if (!globalThis.__tariaRateLimitStore) {
   globalThis.__tariaRateLimitStore = rateLimitStore;
 }
 
-export function enforceRecommendationSecurity(request) {
+const getClientIp = (request) =>
+  request.headers.get("cf-connecting-ip")?.trim() ||
+  request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+  "anonymous";
+
+export function enforceRateLimit(request, { action, maxRequests, windowSeconds }) {
+  const limit = Math.max(Number(maxRequests) || 1, 1);
+  const window = Math.max(Number(windowSeconds) || 1, 1);
+  const now = Date.now();
+  const key = `${action}:${getClientIp(request)}`;
+  const active = (rateLimitStore.get(key) || []).filter((stamp) => now - stamp < window * 1000);
+
+  if (active.length >= limit) {
+    return NextResponse.json(
+      { message: "Rate limit exceeded", timestamp: new Date().toISOString() },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(window),
+          "X-RateLimit-Limit": String(limit),
+        },
+      },
+    );
+  }
+
+  active.push(now);
+  rateLimitStore.set(key, active);
+  return null;
+}
+
+export function enforceRecommendationSecurity(request, { authenticatedBySession = false } = {}) {
   const apiKey = request.headers.get("x-taria-key")?.trim() || "";
 
-  if (tariaConfig.recommendationAuthEnabled) {
+  if (tariaConfig.recommendationAuthEnabled && !authenticatedBySession) {
     if (tariaConfig.recommendationApiKeys.length === 0) {
       return NextResponse.json(
         { message: "Recommendation auth is misconfigured", timestamp: new Date().toISOString() },
@@ -30,9 +60,7 @@ export function enforceRecommendationSecurity(request) {
   }
 
   if (tariaConfig.recommendationRateLimitEnabled) {
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      "anonymous";
+    const ip = getClientIp(request);
     const key = `${apiKey || "anonymous"}:${ip}`;
     const now = Date.now();
     const windowMs = Math.max(tariaConfig.recommendationRateLimitWindowSeconds, 1) * 1000;
@@ -54,6 +82,100 @@ export function enforceRecommendationSecurity(request) {
 
     active.push(now);
     rateLimitStore.set(key, active);
+  }
+
+  return null;
+}
+
+const base64UrlEncode = (value) =>
+  btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+
+const importHmacKey = (secret) =>
+  crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+
+export async function createAssessmentSessionToken(assessmentId, ttlSeconds = tariaConfig.assessmentSessionTtlSeconds) {
+  if (!tariaConfig.assessmentSessionSecret) {
+    return null;
+  }
+
+  const payload = {
+    assessmentId,
+    expiresAt: Math.floor(Date.now() / 1000) + Math.max(Number(ttlSeconds) || 1, 1),
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const key = await importHmacKey(tariaConfig.assessmentSessionSecret);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(encodedPayload),
+  );
+  const encodedSignature = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+  return `${encodedPayload}.${encodedSignature}`;
+}
+
+export async function verifyAssessmentSessionToken(token) {
+  const [encodedPayload, encodedSignature] = String(token || "").split(".");
+  if (!encodedPayload || !encodedSignature || !tariaConfig.assessmentSessionSecret) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encodedPayload)));
+    if (
+      !payload ||
+      typeof payload.assessmentId !== "string" ||
+      !Number.isFinite(Number(payload.expiresAt)) ||
+      Number(payload.expiresAt) < Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+
+    const key = await importHmacKey(tariaConfig.assessmentSessionSecret);
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(encodedSignature),
+      new TextEncoder().encode(encodedPayload),
+    );
+    return valid ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+const readCookie = (request, name) => {
+  const cookieHeader = request.headers.get("cookie") || "";
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  if (!match) return "";
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return "";
+  }
+};
+
+export async function enforceAssessmentSession(request, assessmentId, { allowApiKey = false } = {}) {
+  if (
+    allowApiKey &&
+    tariaConfig.recommendationAuthEnabled &&
+    tariaConfig.recommendationApiKeys.includes(request.headers.get("x-taria-key")?.trim() || "")
+  ) {
+    return null;
+  }
+
+  const token = readCookie(request, "taria_assessment_session");
+  const payload = await verifyAssessmentSessionToken(token);
+  if (!payload || payload.assessmentId !== assessmentId) {
+    return NextResponse.json(
+      { message: "Assessment session required.", timestamp: new Date().toISOString() },
+      { status: 401, headers: { "WWW-Authenticate": 'Session realm="assessment"' } },
+    );
   }
 
   return null;

@@ -286,13 +286,6 @@ export function FarmerRiskClient() {
           </div>
           <h1>Understand the farm before you fund it.</h1>
           <p>Update the farm profile, calculate its current risk, and return the saved decision to Agrifinance.</p>
-          {sourceApplication ? (
-            <div className="farmer-page__context" aria-label="Assessment context">
-              <span><small>FARMER</small>{externalFarmerId || "—"}</span>
-              <span><small>FARM</small>{farmId || "—"}</span>
-              {loanApplicationId ? <span><small>LOAN</small>{loanApplicationId}</span> : null}
-            </div>
-          ) : null}
           {isLoadingExisting ? (
             <p className="farmer-page__loading-note">Loading the latest saved assessment for this farm…</p>
           ) : null}
@@ -504,17 +497,8 @@ export function FarmerRiskClient() {
                         The final risk score places the farmer into a capped funding and premium bracket. Higher
                         scores unlock more loan value and a lower premium amount.
                       </p>
-                      {result.context?.sourceApplication ? (
-                        <p className="farmer-results__save-note">
-                          Linked to {result.context.sourceApplication}
-                          {result.context.externalFarmerId ? ` farmer ${result.context.externalFarmerId}` : ""}
-                          {result.context.loanApplicationId ? ` / loan ${result.context.loanApplicationId}` : ""}.
-                        </p>
-                      ) : null}
                       <p className="farmer-results__save-note">
-                        {result.persisted
-                          ? `Saved assessment ID: ${result.assessmentId}`
-                          : `Temporary result ID: ${result.assessmentId} (storage unavailable)`}
+                        {result.persisted ? "Assessment saved securely." : "Result calculated; storage is unavailable."}
                       </p>
                       {isAgrifinanceLaunch ? (
                         <p className="farmer-results__save-note">
