@@ -276,7 +276,19 @@ function toStoredFarmerRiskResponse(assessment) {
       loanAmount: assessment.loanAmount,
       insurancePremium: assessment.insurancePremium,
       insurancePackage: parseJson(assessment.insurancePackageJson, []),
-      sectionScores: parseJson(assessment.sectionScoresJson, {}),
+      sectionScores: normalizeSectionScores(parseJson(assessment.sectionScoresJson, {})),
     },
   };
+}
+
+function normalizeSectionScores(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).map(([label, score]) => ({ label, value: score }));
+  }
+
+  return [];
 }
