@@ -12,6 +12,29 @@ import {
   farmerResultPages,
 } from "@/lib/taria/farmer-risk";
 
+function readIntegrationContext() {
+  if (typeof window === "undefined") {
+    return {
+      sourceApplication: "",
+      externalFarmerId: "",
+      farmId: "",
+      loanApplicationId: "",
+      returnOrigin: "",
+      handoff: "",
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return {
+    sourceApplication: params.get("sourceApplication")?.trim() || "",
+    externalFarmerId: params.get("externalFarmerId")?.trim() || "",
+    farmId: params.get("farmId")?.trim() || "",
+    loanApplicationId: params.get("loanApplicationId")?.trim() || "",
+    returnOrigin: params.get("returnOrigin")?.trim() || "",
+    handoff: params.get("handoff")?.trim() || "",
+  };
+}
+
 export function FarmerRiskClient() {
   const [form, setForm] = useState(farmerInitialForm);
   const [touched, setTouched] = useState({});
@@ -22,14 +45,8 @@ export function FarmerRiskClient() {
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [returnStatus, setReturnStatus] = useState("idle");
-  const [integrationContext, setIntegrationContext] = useState({
-    sourceApplication: "",
-    externalFarmerId: "",
-    farmId: "",
-    loanApplicationId: "",
-    returnOrigin: "",
-  });
-  const { sourceApplication, externalFarmerId, farmId, loanApplicationId, returnOrigin } = integrationContext;
+  const [integrationContext] = useState(readIntegrationContext);
+  const { sourceApplication, externalFarmerId, farmId, loanApplicationId, returnOrigin, handoff } = integrationContext;
   const isAgrifinanceLaunch =
     sourceApplication.toLowerCase() === "agrifinance" && Boolean(returnOrigin);
   const shouldReturnToOpener = Boolean(
@@ -54,24 +71,12 @@ export function FarmerRiskClient() {
   const currentStepEnd = currentStepStart + currentStep.questions.length - 1;
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    setIntegrationContext({
-      sourceApplication: params.get("sourceApplication")?.trim() || "",
-      externalFarmerId: params.get("externalFarmerId")?.trim() || "",
-      farmId: params.get("farmId")?.trim() || "",
-      loanApplicationId: params.get("loanApplicationId")?.trim() || "",
-      returnOrigin: params.get("returnOrigin")?.trim() || "",
-    });
-  }, []);
-
-  useEffect(() => {
     if (!isAgrifinanceLaunch || !externalFarmerId || !farmId) {
       return;
     }
 
     let cancelled = false;
-    const params = new URLSearchParams({ externalFarmerId, farmId });
+    const params = new URLSearchParams({ externalFarmerId, farmId, handoff });
 
     async function loadExistingAssessment() {
       setIsLoadingExisting(true);
@@ -119,7 +124,7 @@ export function FarmerRiskClient() {
     return () => {
       cancelled = true;
     };
-  }, [externalFarmerId, farmId, isAgrifinanceLaunch, loanApplicationId, sourceApplication]);
+  }, [externalFarmerId, farmId, handoff, isAgrifinanceLaunch, loanApplicationId, sourceApplication]);
 
   function handleFieldChange(controlName, value) {
     setForm((current) => ({
@@ -175,9 +180,6 @@ export function FarmerRiskClient() {
     try {
       const response = await fetch("/api/v1/farmer-risk-assessments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           ...form,
           ...(sourceApplication ? { sourceApplication } : {}),
@@ -185,6 +187,10 @@ export function FarmerRiskClient() {
           ...(farmId ? { farmId } : {}),
           ...(loanApplicationId ? { loanApplicationId } : {}),
         }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(handoff ? { "x-taria-handoff": handoff } : {}),
+        },
       });
       const payload = await response.json();
 
@@ -223,7 +229,7 @@ export function FarmerRiskClient() {
   }
 
   function returnToAgrifinance() {
-    if (!isAgrifinanceLaunch) {
+    if (!isAgrifinanceLaunch || !isAllowedReturnOrigin(returnOrigin)) {
       return;
     }
 
@@ -603,6 +609,20 @@ export function FarmerRiskClient() {
       </div>
     </section>
   );
+}
+
+function isAllowedReturnOrigin(value) {
+  try {
+    const origin = new URL(value).origin;
+    const configured = (process.env.NEXT_PUBLIC_AGRIFINANCE_ALLOWED_ORIGINS ||
+      "http://localhost:4200,https://agrifinance.tripsecureagrifinanceltd.com")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return configured.includes(origin);
+  } catch {
+    return false;
+  }
 }
 
 function isQuestionInvalid(question, value) {

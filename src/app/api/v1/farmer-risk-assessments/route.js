@@ -7,6 +7,7 @@ import {
 import {
   enforceFarmerRiskSecurity,
   getFarmerRiskCorsHeaders,
+  verifyFarmerRiskHandoffToken,
 } from "@/lib/taria/security";
 import {
   farmerRiskAssessmentSchema,
@@ -22,7 +23,7 @@ export async function OPTIONS(request) {
 
 export async function GET(request) {
   const corsHeaders = getFarmerRiskCorsHeaders(request);
-  const blocked = enforceFarmerRiskSecurity(request);
+  const blocked = await enforceFarmerRiskSecurity(request);
 
   if (blocked) {
     Object.entries(corsHeaders).forEach(([key, value]) => {
@@ -34,12 +35,18 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const externalFarmerId = searchParams.get("externalFarmerId")?.trim() || "";
   const farmId = searchParams.get("farmId")?.trim() || "";
+  const handoff = searchParams.get("handoff")?.trim() || "";
 
   if (!externalFarmerId || !farmId) {
     return NextResponse.json(
       { message: "externalFarmerId and farmId are required." },
       { status: 400, headers: corsHeaders }
     );
+  }
+
+  const handoffPayload = await verifyFarmerRiskHandoffToken(handoff);
+  if (!handoffPayload || handoffPayload.farmerId !== externalFarmerId || handoffPayload.farmId !== farmId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: corsHeaders });
   }
 
   try {
@@ -60,18 +67,26 @@ export async function GET(request) {
 
 export async function POST(request) {
   const corsHeaders = getFarmerRiskCorsHeaders(request);
-  const blocked = enforceFarmerRiskSecurity(request);
-
-  if (blocked) {
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      blocked.headers.set(key, value);
-    });
-    return blocked;
-  }
-
   try {
     const payload = await request.json();
     const input = farmerRiskAssessmentSchema.parse(payload);
+    const requiresHandoff = Boolean(input.externalFarmerId || input.farmId || input.sourceApplication);
+    const blocked = await enforceFarmerRiskSecurity(request, { required: requiresHandoff });
+    if (blocked) {
+      Object.entries(corsHeaders).forEach(([key, value]) => blocked.headers.set(key, value));
+      return blocked;
+    }
+    if (requiresHandoff) {
+      const handoff = request.headers.get("x-taria-handoff")?.trim() || "";
+      const handoffPayload = await verifyFarmerRiskHandoffToken(handoff);
+      if (
+        !handoffPayload ||
+        handoffPayload.farmerId !== input.externalFarmerId ||
+        handoffPayload.farmId !== input.farmId
+      ) {
+        return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: corsHeaders });
+      }
+    }
     const assessment = await createFarmerRiskAssessment(input);
 
     return NextResponse.json(assessment, { status: 201, headers: corsHeaders });

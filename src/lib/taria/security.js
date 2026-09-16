@@ -59,27 +59,68 @@ export function enforceRecommendationSecurity(request) {
   return null;
 }
 
-export function enforceFarmerRiskSecurity(request) {
-  const apiKey = request.headers.get("x-taria-key")?.trim() || "";
+const base64UrlToBytes = (value) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
 
-  if (!tariaConfig.farmerRiskAuthEnabled) {
+export async function verifyFarmerRiskHandoffToken(token) {
+  const [encodedPayload, encodedSignature] = String(token || "").split(".");
+  if (!encodedPayload || !encodedSignature || !tariaConfig.farmerRiskHandoffSecret) {
     return null;
   }
 
-  if (tariaConfig.farmerRiskApiKeys.length === 0) {
+  try {
+    const payloadBytes = base64UrlToBytes(encodedPayload);
+    const payload = JSON.parse(new TextDecoder().decode(payloadBytes));
+    if (
+      !payload ||
+      typeof payload.farmerId !== "string" ||
+      typeof payload.farmId !== "string" ||
+      !Number.isFinite(Number(payload.expiresAt)) ||
+      Number(payload.expiresAt) < Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(tariaConfig.farmerRiskHandoffSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(encodedSignature),
+      new TextEncoder().encode(encodedPayload),
+    );
+    return valid ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function enforceFarmerRiskSecurity(request, { required = true } = {}) {
+  if (!required) return null;
+
+  const handoff = request.headers.get("x-taria-handoff")?.trim() ||
+    new URL(request.url).searchParams.get("handoff")?.trim() || "";
+  if (!handoff || !tariaConfig.farmerRiskHandoffSecret) {
     return NextResponse.json(
-      { message: "Farmer risk auth is misconfigured", timestamp: new Date().toISOString() },
-      { status: 503 }
+      { message: "Authenticated TARIA handoff required", timestamp: new Date().toISOString() },
+      { status: 401, headers: { "WWW-Authenticate": 'Handoff realm="farmer-risk"' } }
     );
   }
 
-  if (!tariaConfig.farmerRiskApiKeys.includes(apiKey)) {
+  const payload = await verifyFarmerRiskHandoffToken(handoff);
+  if (!payload) {
     return NextResponse.json(
       { message: "Unauthorized", timestamp: new Date().toISOString() },
-      {
-        status: 401,
-        headers: { "WWW-Authenticate": 'ApiKey realm="farmer-risk"' },
-      }
+      { status: 401 }
     );
   }
 

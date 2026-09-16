@@ -23,6 +23,9 @@ export const tariaConfig = {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean),
+  farmerRiskHandoffSecret:
+    process.env.FARMER_RISK_HANDOFF_SECRET ||
+    (process.env.NODE_ENV === "production" ? "" : "local-development-handoff"),
   recordsAuthEnabled: process.env.RECORDS_AUTH_ENABLED !== "false",
   recordsApiKeys: (process.env.RECORDS_API_KEYS || "")
     .split(",")
